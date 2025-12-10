@@ -1,0 +1,67 @@
+name: Sync from MayukhaRaghav Repo
+
+on:
+  # Run every 15 mins during work hours (Mon-Fri, 11:00-22:00 UTC)
+  schedule:
+    - cron: '*/15 11-22 * * 1-5'
+  
+  # Also trigger when MayukhaRaghav repo updates (via repository_dispatch)
+  repository_dispatch:
+    types: [sync-report]
+  
+  # Allow manual trigger
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout nr-esefw repo
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch latest from MayukhaRaghav repo
+        run: |
+          # Clone the gh-pages branch from the source repo
+          git clone --branch gh-pages --single-branch https://github.com/MayukhaRaghav/e2e-test-report.git source-repo
+          
+          # Copy all files (except .git)
+          rsync -av --exclude='.git' source-repo/ ./
+          
+          # Clean up
+          rm -rf source-repo
+
+      - name: Check for changes
+        id: check_changes
+        run: |
+          if git diff --quiet && git diff --staged --quiet; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No changes detected"
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Changes detected"
+          fi
+
+      - name: Commit and Push
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          git add -A
+          git commit -m "Sync from MayukhaRaghav/e2e-test-report - $(date +'%Y-%m-%d %H:%M:%S UTC')"
+          git push origin gh-pages
+
+      - name: Summary
+        run: |
+          echo "### Sync Complete! 🎉" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Source: https://mayukharaghav.github.io/e2e-test-report/" >> $GITHUB_STEP_SUMMARY
+          echo "- Target: https://nr-esefw.github.io/e2e-test-report/" >> $GITHUB_STEP_SUMMARY
+          echo "- Time: $(date +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY

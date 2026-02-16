@@ -1,0 +1,80 @@
+name: 📊 Generate E2E Test & Bug Reports
+
+on:
+  # Run daily at 9 AM UTC (adjust timezone as needed)
+  schedule:
+    - cron: '0 9 * * *'
+  
+  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to run against'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - production
+        - staging
+        - development
+
+jobs:
+  generate-reports:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 🔄 Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: 🟢 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: 📦 Install dependencies
+      run: npm install
+      
+    - name: 🔐 Create OAuth credentials
+      run: |
+        echo '${{ secrets.GOOGLE_OAUTH_CREDENTIALS }}' > oauth-credentials.json
+        
+    - name: 📊 Generate E2E Test & Bug Reports
+      run: node google-sheets-pivot-reporter-oauth-manual.js
+      env:
+        # Google Sheets Configuration
+        GOOGLE_SHEETS_SPREADSHEET_ID: ${{ secrets.GOOGLE_SHEETS_SPREADSHEET_ID }}
+        GOOGLE_SHEETS_GID: ${{ secrets.GOOGLE_SHEETS_GID }}
+        GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+        GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+        
+        # JIRA Integration Configuration
+        JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+        JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+        JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+        JIRA_CLIENT_SECRET: ${{ secrets.JIRA_CLIENT_SECRET }}
+        
+        # X-Ray Configuration
+        XRAY_CLIENT_ID: ${{ secrets.XRAY_CLIENT_ID }}
+        XRAY_CLIENT_SECRET: ${{ secrets.XRAY_CLIENT_SECRET }}
+        
+    - name: 📤 Upload report as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: e2e-test-bug-report-${{ github.run_number }}
+        path: o2c-test-status-report.html
+        retention-days: 30
+        
+    - name: 📧 Send report notification (Optional)
+      if: success()
+      run: |
+        echo "✅ E2E Test & Bug Report generated successfully!"
+        echo "📊 Test Results: Available in report"
+        echo "🐛 JIRA Issues: Fetched from New Relic instance"
+        echo "📅 Generated: $(date)"
+        
+    - name: 🚨 Notify on failure
+      if: failure()
+      run: |
+        echo "❌ Report generation failed!"
+        echo "Please check the workflow logs for details."

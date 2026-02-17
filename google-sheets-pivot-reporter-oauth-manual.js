@@ -749,12 +749,6 @@ class GoogleSheetsPivotReporterOAuth {
       box-shadow: 0 2px 10px rgba(0,0,0,0.1);
       text-align: center;
     }
-    .bug-chart-container {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 30px;
-      margin-bottom: 30px;
-    }
     .bug-list {
       background: white;
       border-radius: 12px;
@@ -790,9 +784,11 @@ class GoogleSheetsPivotReporterOAuth {
           <button class="tab-button active" onclick="switchTab('test-results')">
             🧪 Test Results Dashboard
           </button>
+          ${process.env.ENABLE_BUG_REPORTS === 'true' ? `
           <button class="tab-button" onclick="switchTab('bug-reports')">
             🐛 Bug Reports Dashboard
           </button>
+          ` : ''}
         </div>
         
         <div id="test-results" class="tab-content active">
@@ -876,9 +872,11 @@ class GoogleSheetsPivotReporterOAuth {
     </div>
   </div>
   
+  ${process.env.ENABLE_BUG_REPORTS === 'true' ? `
   <div id="bug-reports" class="tab-content">
     ${this.generateBugReportsHTML()}
   </div>
+  ` : ''}
 </div>
 
   <script>
@@ -998,69 +996,6 @@ class GoogleSheetsPivotReporterOAuth {
       // Show selected tab and activate button
       document.getElementById(tabName).classList.add('active');
       event.target.classList.add('active');
-      
-      // Initialize bug charts when bug reports tab is opened
-      if (tabName === 'bug-reports') {
-        setTimeout(initializeBugCharts, 100);
-      }
-    }
-    
-    // Initialize bug tracking charts with real JIRA data
-    function initializeBugCharts() {
-      const bugStatusData = ${JSON.stringify(Object.entries(this.bugMetrics.statuses))};
-      const bugPriorityData = ${JSON.stringify(Object.entries(this.bugMetrics.priorities))};
-      
-      // Bug Status Chart
-      const statusCtx = document.getElementById('bugStatusChart');
-      if (statusCtx && !statusCtx.chart) {
-        statusCtx.chart = new Chart(statusCtx, {
-          type: 'doughnut',
-          data: {
-            labels: bugStatusData.map(item => item[0]),
-            datasets: [{
-              data: bugStatusData.map(item => item[1]),
-              backgroundColor: ['#6b7280', '#ea580c', '#10b981', '#7c3aed', '#ca8a04'],
-              borderWidth: 0
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: {
-                position: 'bottom',
-                labels: { padding: 20, font: { size: 12 } }
-              }
-            }
-          }
-        });
-      }
-      
-      // Bug Priority Chart
-      const priorityCtx = document.getElementById('bugPriorityChart');
-      if (priorityCtx && !priorityCtx.chart) {
-        priorityCtx.chart = new Chart(priorityCtx, {
-          type: 'doughnut',
-          data: {
-            labels: bugPriorityData.map(item => item[0]),
-            datasets: [{
-              data: bugPriorityData.map(item => item[1]),
-              backgroundColor: ['#dc2626', '#ea580c', '#ca8a04', '#16a34a'],
-              borderWidth: 0
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: {
-                position: 'bottom',
-                labels: { padding: 20, font: { size: 12 } }
-              }
-            }
-          }
-        });
-      }
     }
     
     window.onload = function() {
@@ -1131,12 +1066,139 @@ class GoogleSheetsPivotReporterOAuth {
         }
       };
     };
+
+    // Label filtering functionality
+    function filterByLabel(selectedLabel) {
+      const rows = document.querySelectorAll('.bug-row');
+      const statusHeaders = document.querySelectorAll('.status-header');
+      let visibleCount = 0;
+      
+      // Hide all status headers first
+      statusHeaders.forEach(header => {
+        header.style.display = 'none';
+      });
+      
+      rows.forEach(row => {
+        const labels = row.getAttribute('data-labels');
+        if (labels && labels.split(',').includes(selectedLabel)) {
+          row.style.display = '';
+          visibleCount++;
+          // Show the status header for this row
+          const statusClass = row.className.match(/status-([\w-]+)/);
+          if (statusClass) {
+            const statusHeader = document.querySelector('.status-header[onclick*="' + statusClass[1] + '"]');
+            if (statusHeader) statusHeader.style.display = '';
+          }
+        } else {
+          row.style.display = 'none';
+        }
+      });
+      
+      // Update the table header to show filtered results
+      updateTableHeader(selectedLabel, visibleCount);
+      
+      // Highlight selected label card
+      highlightSelectedLabel(selectedLabel);
+    }
+    
+    function showAllTickets() {
+      const rows = document.querySelectorAll('.bug-row');
+      const statusHeaders = document.querySelectorAll('.status-header');
+      
+      // Show all status headers
+      statusHeaders.forEach(header => {
+        header.style.display = '';
+      });
+      
+      // Show only tickets in expanded status groups
+      rows.forEach(row => {
+        const statusClass = row.className.match(/status-([\w-]+)/);
+        if (statusClass) {
+          const statusName = statusClass[1];
+          const toggle = document.getElementById('toggle-' + statusName);
+          if (toggle && toggle.textContent === '▼') {
+            row.style.display = '';
+          } else {
+            row.style.display = 'none';
+          }
+        }
+      });
+      
+      // Reset table header
+      updateTableHeader('All', rows.length);
+      
+      // Remove highlight from label cards
+      highlightSelectedLabel(null);
+    }
+
+    // Status group toggle functionality
+    function toggleStatusGroup(statusName) {
+      const rows = document.querySelectorAll('.status-' + statusName);
+      const toggle = document.getElementById('toggle-' + statusName);
+      const isExpanded = toggle.textContent === '▼';
+      
+      rows.forEach(row => {
+        row.style.display = isExpanded ? 'none' : '';
+      });
+      
+      toggle.textContent = isExpanded ? '▶' : '▼';
+    }
+    
+    function updateTableHeader(filterType, count) {
+      const header = document.querySelector('.bug-list h3');
+      if (header) {
+        if (filterType === 'All') {
+          const totalTickets = document.querySelectorAll('.bug-row').length;
+          header.innerHTML = '🎯 All BA QA Issues <span style="font-size: 0.8em; color: #6b7280;">(' + totalTickets + ' total tickets • Grouped by status • Click to expand/collapse • Click label above to filter)</span>';
+        } else {
+          header.innerHTML = '🏷️ Tickets with Label: <span style="background: #6366f1; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8em;">' + filterType + '</span> <span style="font-size: 0.8em; color: #6b7280;">(' + count + ' tickets found)</span>';
+        }
+      }
+    }
+    
+    function highlightSelectedLabel(selectedLabel) {
+      const labelCards = document.querySelectorAll('.label-filter-card');
+      labelCards.forEach(card => {
+        if (selectedLabel && card.textContent.includes(selectedLabel)) {
+          card.style.background = '#6366f1';
+          card.style.color = 'white';
+          const h3 = card.querySelector('h3');
+          if (h3) h3.style.color = 'white';
+          const count = card.querySelector('div[style*="font-size: 2em"]');
+          if (count) count.style.color = 'white';
+        } else if (selectedLabel === null && card.textContent.includes('All Tickets')) {
+          card.style.background = '#374151';
+          card.style.color = 'white';
+          const h3 = card.querySelector('h3');
+          if (h3) h3.style.color = 'white';
+          const count = card.querySelector('div[style*="font-size: 2em"]');
+          if (count) count.style.color = 'white';
+        } else {
+          // Reset to original styles
+          if (card.textContent.includes('All Tickets')) {
+            card.style.background = '#f8fafc';
+            card.style.color = '';
+            const h3 = card.querySelector('h3');
+            if (h3) h3.style.color = '#374151';
+            const count = card.querySelector('div[style*="font-size: 2em"]');
+            if (count) count.style.color = '#374151';
+          } else {
+            card.style.background = 'white';
+            card.style.color = '';
+            const h3 = card.querySelector('h3');
+            if (h3) h3.style.color = '#6366f1';
+            const count = card.querySelector('div[style*="font-size: 2em"]');
+            if (count) count.style.color = '#6366f1';
+          }
+        }
+      });
+    }
   </script>
 </body>
 </html>`;
   }
 
-  // Fetch JIRA issues using service account
+  // Fetch JIRA issues using service account with pagination
   async fetchJiraIssues() {
     try {
       console.log('🐛 Fetching JIRA issues...');
@@ -1150,39 +1212,77 @@ class GoogleSheetsPivotReporterOAuth {
       
       console.log(`🔗 JIRA URL: ${jiraUrl}`);
       
-      const response = await axios({
-        method: 'GET',
-        url: jiraUrl,
-        headers: {
-          'Authorization': `Basic ${jiraAuth}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        params: {
-          jql: '(project = NR AND (issuetype = "BA QA Issue" OR issuetype = "Bug" OR issuetype = "Defect" OR issuetype = "E2E Defect")) OR reporter = "vthogaru@newrelic.com" ORDER BY created DESC',
-          maxResults: 500,
-          fields: 'key,summary,priority,status,reporter,environment,created,updated,issuetype,assignee'
-        },
-        timeout: 30000
-      });
+      let allIssues = [];
+      let startAt = 0;
+      const maxResults = 100; // JIRA's typical max per request
+      let isLast = false;
+      let issues = [];
       
-      const issues = response.data.issues || [];
-      console.log(`✅ Fetched ${issues.length} JIRA issues`);
+      do {
+        const response = await axios({
+          method: 'GET',
+          url: jiraUrl,
+          headers: {
+            'Authorization': `Basic ${jiraAuth}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          params: {
+            jql: 'project = NR AND issuetype = "BA QA Issue" OR reporter = "vthogaru@newrelic.com" ORDER BY created DESC',
+            startAt: startAt,
+            maxResults: maxResults,
+            fields: 'key,summary,priority,status,reporter,assignee,created,updated,labels'
+          },
+          timeout: 30000
+        });
+        
+        issues = response.data.issues || [];
+        isLast = response.data.isLast !== false; // Default to true if not provided
+        allIssues = allIssues.concat(issues);
+        startAt += maxResults;
+        
+        console.log(`📥 Fetched ${issues.length} issues (${allIssues.length} total so far) - ${isLast ? 'Last page' : 'More pages available'}`);
+        
+        // Debug: log response data on first call
+        if (startAt === maxResults) {
+          console.log(`🔍 Debug - Response keys: ${Object.keys(response.data).join(', ')}`);
+          console.log(`🔍 Debug - isLast: ${response.data.isLast}, nextPageToken: ${response.data.nextPageToken || 'none'}`);
+        }
+        
+        // Safety break to avoid infinite loops
+        if (allIssues.length >= 2000) {
+          console.log('⚠️ Reached safety limit of 2000 issues');
+          break;
+        }
+        
+      } while (!isLast && issues.length === maxResults);
+      
+      console.log(`✅ Fetched ${allIssues.length} JIRA issues total`);
       
       // Process JIRA data for dashboard
-      this.jiraBugs = issues.map(issue => ({
+      this.jiraBugs = allIssues.map(issue => ({
         id: issue.key,
         summary: issue.fields.summary || 'No summary',
         priority: issue.fields.priority?.name || 'Medium',
         status: issue.fields.status?.name || 'Open',
         reporter: issue.fields.reporter?.displayName || 'Unknown',
-        reporterEmail: issue.fields.reporter?.emailAddress || 'Unknown',
+        reporterEmail: issue.fields.reporter?.emailAddress || '',
         assignee: issue.fields.assignee?.displayName || 'Unassigned',
-        issueType: issue.fields.issuetype?.name || 'Issue',
-        environment: issue.fields.environment || 'Not specified',
+        assigneeEmail: issue.fields.assignee?.emailAddress || '',
+        labels: issue.fields.labels || [],
         created: new Date(issue.fields.created).toLocaleDateString(),
         updated: new Date(issue.fields.updated).toLocaleDateString()
       }));
+      
+      // Filter Veeraraghava Thogaru's tickets (assigned or reported)
+      const vthogaru_tickets = this.jiraBugs.filter(bug => 
+        (bug.reporterEmail && bug.reporterEmail.includes('vthoharu@newrelic.com')) ||
+        (bug.assigneeEmail && bug.assigneeEmail.includes('vthoharu@newrelic.com')) ||
+        bug.reporter === 'Veeraraghava Thogaru' ||
+        bug.assignee === 'Veeraraghava Thogaru'
+      );
+      
+      console.log(`🎯 Found ${vthogaru_tickets.length} tickets for Veeraraghava Thogaru`);
       
       this.generateBugMetrics();
       
@@ -1215,18 +1315,6 @@ class GoogleSheetsPivotReporterOAuth {
       acc[bug.status] = (acc[bug.status] || 0) + 1;
       return acc;
     }, {});
-    
-    // Add reporter analytics (matching your E2E Defects dashboard)
-    this.bugMetrics.reporters = this.jiraBugs.reduce((acc, bug) => {
-      const reporter = bug.reporter === 'Unknown' ? 'Unknown' : bug.reporter;
-      acc[reporter] = (acc[reporter] || 0) + 1;
-      return acc;
-    }, {});
-    
-    // Get vthogaru's specific tickets
-    this.bugMetrics.vthogaru_tickets = this.jiraBugs.filter(bug => 
-      bug.reporterEmail && bug.reporterEmail.includes('vthogaru@newrelic')
-    );
   }
 
   // Generate bug reports HTML with real JIRA data
@@ -1242,41 +1330,91 @@ class GoogleSheetsPivotReporterOAuth {
       'In Progress': '#ea580c', 'In Review': '#ca8a04',
       'Done': '#10b981', 'Fixed': '#10b981', 'Resolved': '#10b981', 'Closed': '#7c3aed'
     };
+
+    // Count labels across all bugs
+    const labelCounts = {};
+    this.jiraBugs.forEach(bug => {
+      if (bug.labels && bug.labels.length > 0) {
+        bug.labels.forEach(label => {
+          labelCounts[label] = (labelCounts[label] || 0) + 1;
+        });
+      }
+    });
+
+    const { priorities, statuses } = this.bugMetrics;
     
-    const { priorities, statuses, reporters, vthogaru_tickets } = this.bugMetrics;
+    // Sort bugs by creation date (newest first)
+    const sortedBugs = [...this.jiraBugs].sort((a, b) => new Date(b.created) - new Date(a.created));
     
-    // Sort reporters by issue count (matching your dashboard)
-    const sortedReporters = Object.entries(reporters).sort(([,a], [,b]) => b - a);
-    const topReporters = sortedReporters.slice(0, 10);
+    // Group bugs by status
+    const statusGroups = {
+      'Open': [],
+      'In Progress': [],
+      'To Do': [],
+      'Backlog': [],
+      'In Review': [],
+      'Done': [],
+      'Fixed': [],
+      'Resolved': [],
+      'Closed': [],
+      'Other': []
+    };
     
-    const bugRows = this.jiraBugs.slice(0, 20).map(bug => `
-      <tr style="border-bottom: 1px solid #e2e8f0;">
-        <td style="padding: 12px; font-weight: 600; color: #3b82f6;">${bug.id}</td>
-        <td style="padding: 12px; max-width: 400px; word-wrap: break-word;">${bug.summary}</td>
-        <td style="padding: 12px;">
-          <span style="background: ${priorityColors[bug.priority] || '#6b7280'}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8em;">${bug.priority}</span>
-        </td>
-        <td style="padding: 12px;">
-          <span style="background: ${statusColors[bug.status] || '#6b7280'}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8em;">${bug.status}</span>
-        </td>
-        <td style="padding: 12px;">${bug.reporter}</td>
-        <td style="padding: 12px;">${bug.issueType}</td>
-        <td style="padding: 12px;">${bug.assignee}</td>
-      </tr>`).join('');
-    
-    const vthogaru_rows = vthogaru_tickets.slice(0, 10).map(bug => `
-      <tr style="border-bottom: 1px solid #e2e8f0; background: #f0f9ff;">
-        <td style="padding: 12px; font-weight: 600; color: #3b82f6;">${bug.id}</td>
-        <td style="padding: 12px; max-width: 400px; word-wrap: break-word;">${bug.summary}</td>
-        <td style="padding: 12px;">
-          <span style="background: ${priorityColors[bug.priority] || '#6b7280'}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8em;">${bug.priority}</span>
-        </td>
-        <td style="padding: 12px;">
-          <span style="background: ${statusColors[bug.status] || '#6b7280'}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8em;">${bug.status}</span>
-        </td>
-        <td style="padding: 12px;">${bug.assignee}</td>
-        <td style="padding: 12px;">${bug.created}</td>
-      </tr>`).join('');
+    sortedBugs.forEach(bug => {
+      const status = bug.status;
+      if (statusGroups[status]) {
+        statusGroups[status].push(bug);
+      } else {
+        statusGroups['Other'].push(bug);
+      }
+    });
+
+    // Function to generate table rows for a status group
+    const generateStatusSection = (statusName, bugs, isExpanded = false) => {
+      if (bugs.length === 0) return '';
+      
+      const rows = bugs.map(bug => `
+        <tr class="bug-row status-${statusName.replace(/\s+/g, '-').toLowerCase()}" data-labels="${(bug.labels || []).join(',')}" data-status="${statusName}" style="border-bottom: 1px solid #e2e8f0; ${!isExpanded ? 'display: none;' : ''}">
+          <td style="padding: 12px; font-weight: 600; color: #3b82f6;">${bug.id}</td>
+          <td style="padding: 12px; max-width: 300px; word-wrap: break-word;">${bug.summary}</td>
+          <td style="padding: 12px;">
+            <span style="background: ${priorityColors[bug.priority] || '#6b7280'}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8em;">${bug.priority}</span>
+          </td>
+          <td style="padding: 12px;">
+            <span style="background: ${statusColors[bug.status] || '#6b7280'}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8em;">${bug.status}</span>
+          </td>
+          <td style="padding: 12px;">
+            ${bug.labels && bug.labels.length > 0 ? 
+              bug.labels.map(label => `<span style="background: #e2e8f0; color: #374151; padding: 2px 6px; border-radius: 3px; font-size: 0.75em; margin-right: 4px;">${label}</span>`).join(' ') : 
+              '<span style="color: #9ca3af; font-style: italic;">No labels</span>'}
+          </td>
+          <td style="padding: 12px;">${bug.reporter}</td>
+          <td style="padding: 12px;">${bug.created}</td>
+        </tr>`).join('');
+      
+      return `
+        <tr class="status-header" onclick="toggleStatusGroup('${statusName.replace(/\s+/g, '-').toLowerCase()}')" style="background: #f1f5f9; cursor: pointer; border-top: 2px solid #cbd5e1;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
+          <td colspan="7" style="padding: 15px; font-weight: 700; color: #475569;">
+            <span id="toggle-${statusName.replace(/\s+/g, '-').toLowerCase()}" style="font-size: 0.9em; margin-right: 8px; transition: transform 0.2s ease;">${isExpanded ? '▼' : '▶'}</span>
+            <span style="background: ${statusColors[statusName] || '#6b7280'}; color: white; padding: 4px 12px; border-radius: 6px; margin-right: 10px;">${statusName}</span>
+            <span style="color: #64748b;">• ${bugs.length} ticket${bugs.length > 1 ? 's' : ''}</span>
+          </td>
+        </tr>
+        ${rows}`;
+    };
+
+    const statusSections = [
+      generateStatusSection('Open', statusGroups['Open'], true), // Open by default
+      generateStatusSection('In Progress', statusGroups['In Progress']),
+      generateStatusSection('To Do', statusGroups['To Do']),
+      generateStatusSection('Backlog', statusGroups['Backlog']),
+      generateStatusSection('In Review', statusGroups['In Review']),
+      generateStatusSection('Done', statusGroups['Done']),
+      generateStatusSection('Fixed', statusGroups['Fixed']),
+      generateStatusSection('Resolved', statusGroups['Resolved']),
+      generateStatusSection('Closed', statusGroups['Closed']),
+      generateStatusSection('Other', statusGroups['Other'])
+    ].filter(section => section !== '').join('');
     
     return `
       <!-- Bug Reports Dashboard -->
@@ -1304,48 +1442,25 @@ class GoogleSheetsPivotReporterOAuth {
         </div>
       </div>
       
-      <div class="bug-chart-container">
-        <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-          <h3 style="margin: 0 0 20px 0; color: #374151;">📊 Bug Status Distribution</h3>
-          <canvas id="bugStatusChart" width="400" height="300"></canvas>
-        </div>
-        <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-          <h3 style="margin: 0 0 20px 0; color: #374151;">👥 Top Bug Reporters</h3>
-          <div style="max-height: 300px; overflow-y: auto;">
-            ${topReporters.map(([reporter, count]) => `
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f3f4f6;">
-                <span style="font-weight: 600; color: #374151;">${reporter}</span>
-                <span style="background: #3b82f6; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.9em; font-weight: 600;">${count}</span>
-              </div>
-            `).join('')}
+      <div class="bug-metrics-grid" style="margin: 30px 0;">
+        <h3 style="margin: 0 0 20px 0; color: #374151; text-align: center; width: 100%;">🏷️ Bug Labels Distribution</h3>
+        ${Object.entries(labelCounts).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([label, count]) => `
+          <div class="bug-metric-card label-filter-card" onclick="filterByLabel('${label}')" style="min-width: 200px; cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 20px rgba(99, 102, 241, 0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 10px rgba(0,0,0,0.1)'">
+            <h3 style="color: #6366f1; margin: 0 0 10px 0; font-size: 0.9em; word-break: break-word;">${label}</h3>
+            <div style="font-size: 2em; font-weight: 700; color: #6366f1;">${count}</div>
+            <div style="font-size: 0.8em; color: #6b7280; margin-top: 5px;">ticket${count > 1 ? 's' : ''}</div>
           </div>
+        `).join('')}
+        ${Object.keys(labelCounts).length === 0 ? '<div style="text-align: center; color: #6b7280; font-style: italic; width: 100%;">No labels found</div>' : ''}
+        <div class="bug-metric-card label-filter-card" onclick="showAllTickets()" style="min-width: 200px; cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease; background: #f8fafc;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 20px rgba(0,0,0,0.2)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 10px rgba(0,0,0,0.1)'">
+          <h3 style="color: #374151; margin: 0 0 10px 0; font-size: 0.9em;">All Tickets</h3>
+          <div style="font-size: 2em; font-weight: 700; color: #374151;">${this.jiraBugs.length}</div>
+          <div style="font-size: 0.8em; color: #6b7280; margin-top: 5px;">total</div>
         </div>
       </div>
       
       <div class="bug-list">
-        <h3 style="margin: 0 0 20px 0; color: #374151;">🎯 Your Bug Tickets (vthogaru@newrelic)</h3>
-        <div style="background: #eff6ff; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
-          <strong style="color: #1d4ed8;">Total Issues Created by You: ${vthogaru_tickets.length}</strong>
-        </div>
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
-          <thead>
-            <tr style="background: #f0f9ff; border-bottom: 2px solid #e2e8f0;">
-              <th style="padding: 12px; text-align: left; font-weight: 600;">Bug ID</th>
-              <th style="padding: 12px; text-align: left; font-weight: 600;">Summary</th>
-              <th style="padding: 12px; text-align: left; font-weight: 600;">Priority</th>
-              <th style="padding: 12px; text-align: left; font-weight: 600;">Status</th>
-              <th style="padding: 12px; text-align: left; font-weight: 600;">Assignee</th>
-              <th style="padding: 12px; text-align: left; font-weight: 600;">Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${vthogaru_rows || '<tr><td colspan="6" style="padding: 20px; text-align: center; color: #6b7280;">No tickets found for vthogaru@newrelic</td></tr>'}
-          </tbody>
-        </table>
-      </div>
-      
-      <div class="bug-list">
-        <h3 style="margin: 0 0 20px 0; color: #374151;">🎯 All E2E Defects & BA QA Issues</h3>
+        <h3 style="margin: 0 0 20px 0; color: #374151;">🎯 All BA QA Issues <span style="font-size: 0.8em; color: #6b7280;">(${this.jiraBugs.length} total tickets • Grouped by status • Click to expand/collapse • Click label above to filter)</span></h3>
         <table style="width: 100%; border-collapse: collapse;">
           <thead>
             <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
@@ -1353,13 +1468,13 @@ class GoogleSheetsPivotReporterOAuth {
               <th style="padding: 12px; text-align: left; font-weight: 600;">Summary</th>
               <th style="padding: 12px; text-align: left; font-weight: 600;">Priority</th>
               <th style="padding: 12px; text-align: left; font-weight: 600;">Status</th>
+              <th style="padding: 12px; text-align: left; font-weight: 600;">Labels</th>
               <th style="padding: 12px; text-align: left; font-weight: 600;">Reporter</th>
-              <th style="padding: 12px; text-align: left; font-weight: 600;">Type</th>
-              <th style="padding: 12px; text-align: left; font-weight: 600;">Assignee</th>
+              <th style="padding: 12px; text-align: left; font-weight: 600;">Created</th>
             </tr>
           </thead>
           <tbody>
-            ${bugRows}
+            ${statusSections}
           </tbody>
         </table>
       </div>`;

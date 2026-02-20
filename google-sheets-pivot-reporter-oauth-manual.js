@@ -347,7 +347,7 @@ class GoogleSheetsPivotReporterOAuth {
         const borderColor = statusColors[row.overallStatus] || '#e0e0e0';
         
         ticketDetailsHTML.push(`
-          <div style="
+          <div data-status="${row.overallStatus}" style="
             background: ${bgColor};
             border-left: 4px solid ${borderColor};
             margin: 4px 0;
@@ -970,45 +970,41 @@ class GoogleSheetsPivotReporterOAuth {
   var status = document.getElementById('statusSelect').value;
   var visibleBlocks = 0;
   var totalVisibleRows = 0;
-  
+
   document.querySelectorAll('.aggregate-block').forEach(function(block) {
     var blockTester = block.dataset.tester;
     var blockStatuses = (block.dataset.statuses || '').split(',');
-    
-    // Check if this tester block should be shown
-    var showBlock = (tester === 'ALL' || blockTester === tester) && 
+
+    var showBlock = (tester === 'ALL' || blockTester === tester) &&
                    (status === 'ALL' || blockStatuses.includes(status));
-    
+
     if (!showBlock) {
       block.style.display = 'none';
       return;
     }
-    
+
     var blockHasVisibleRows = false;
     block.style.display = 'block';
-    
-    // FIX: Use data-section attribute instead of broken style selector
+
+    // LEFT PANE: Use data-section + data-status attributes (reliable, no style guessing)
     var ticketDetailsContainer = block.querySelector('[data-section="ticket-details"]');
     if (ticketDetailsContainer) {
-      var ticketRows = ticketDetailsContainer.querySelectorAll('div[style*="border-left"]');
+      var ticketRows = ticketDetailsContainer.querySelectorAll('div[data-status]');
       var visibleRowsInBlock = 0;
-      
+
       ticketRows.forEach(function(row) {
-        var statusSpan = row.querySelector('span[style*="text-transform: uppercase"]');
-        if (statusSpan) {
-          var rowStatus = statusSpan.textContent.trim().toUpperCase();
-          if (status === 'ALL' || rowStatus === status.toUpperCase()) {
-            row.style.display = 'block';
-            visibleRowsInBlock++;
-            totalVisibleRows++;
-            blockHasVisibleRows = true;
-          } else {
-            row.style.display = 'none';
-          }
+        var rowStatus = (row.getAttribute('data-status') || '').trim().toUpperCase();
+        if (status === 'ALL' || rowStatus === status.toUpperCase()) {
+          row.style.display = 'block';
+          visibleRowsInBlock++;
+          totalVisibleRows++;
+          blockHasVisibleRows = true;
+        } else {
+          row.style.display = 'none';
         }
       });
-      
-      // Show empty state message in ticket details if no rows match
+
+      // Show empty state if no rows matched
       var existingEmptyMsg = ticketDetailsContainer.querySelector('.empty-ticket-details');
       if (visibleRowsInBlock === 0 && status !== 'ALL') {
         if (!existingEmptyMsg) {
@@ -1018,16 +1014,14 @@ class GoogleSheetsPivotReporterOAuth {
           emptyMsg.innerHTML = '📭 No ' + status.toLowerCase() + ' iterations found for this tester';
           ticketDetailsContainer.appendChild(emptyMsg);
         }
-        ticketDetailsContainer.style.display = 'block';
       } else {
         if (existingEmptyMsg) {
           existingEmptyMsg.remove();
         }
-        ticketDetailsContainer.style.display = 'block';
       }
     }
-    
-    // Filter detailed table rows in the collapsible section
+
+    // COLLAPSIBLE TABLE: Filter rows in expanded detail section
     var detailTable = block.querySelector('table tbody');
     if (detailTable) {
       detailTable.querySelectorAll('tr').forEach(function(tr) {
@@ -1046,15 +1040,15 @@ class GoogleSheetsPivotReporterOAuth {
         }
       });
     }
-    
-    // Hide block if no visible rows
+
+    // Hide block if nothing visible
     if (!blockHasVisibleRows && (tester !== 'ALL' || status !== 'ALL')) {
       block.style.display = 'none';
     } else if (blockHasVisibleRows) {
       visibleBlocks++;
     }
   });
-  
+
   // Show/hide no records message
   var noRecordsMsg = document.getElementById('noRecordsMessage');
   if (noRecordsMsg) {
@@ -1064,8 +1058,7 @@ class GoogleSheetsPivotReporterOAuth {
       noRecordsMsg.style.display = 'none';
     }
   }
-} 
-    
+}
     // Tab switching functionality
     function switchTab(tabName) {
       // Hide all tab contents

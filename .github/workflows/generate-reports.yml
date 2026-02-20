@@ -37,10 +37,35 @@ jobs:
       
     - name: 🔐 Create OAuth credentials
       run: |
+        echo "🔍 Checking secrets availability..."
+        echo "GOOGLE_OAUTH_CREDENTIALS length: ${#GOOGLE_OAUTH_CREDENTIALS}"
+        echo "GOOGLE_OAUTH_TOKEN length: ${#GOOGLE_OAUTH_TOKEN}"
+        
         echo '${{ secrets.GOOGLE_OAUTH_CREDENTIALS }}' > oauth-credentials.json
+        echo '${{ secrets.GOOGLE_OAUTH_TOKEN }}' > google-token.json
+        
+        echo "✅ Created oauth-credentials.json ($(wc -c < oauth-credentials.json) bytes)"
+        echo "✅ Created google-token.json ($(wc -c < google-token.json) bytes)"
+        
+        echo "🔍 Verifying file contents..."
+        echo "oauth-credentials.json first 50 chars:"
+        head -c 50 oauth-credentials.json && echo "..."
+        echo "google-token.json first 50 chars:"
+        head -c 50 google-token.json && echo "..."
+        
+        echo "📋 Directory listing:"
+        ls -la *.json
+      env:
+        GOOGLE_OAUTH_CREDENTIALS: ${{ secrets.GOOGLE_OAUTH_CREDENTIALS }}
+        GOOGLE_OAUTH_TOKEN: ${{ secrets.GOOGLE_OAUTH_TOKEN }}
         
     - name: 📊 Generate E2E Test & Bug Reports
-      run: node google-sheets-pivot-reporter-oauth-manual.js
+      run: |
+        echo "🚀 Starting report generation..."
+        echo "📁 Current directory: $(pwd)"
+        echo "📋 Files in directory: $(ls -la | grep -E '\.(json|js)$' | wc -l) relevant files"
+        node google-sheets-pivot-reporter-oauth-manual.js
+        echo "✅ Report generation completed!"
       env:
         # Google Sheets Configuration
         GOOGLE_SHEETS_SPREADSHEET_ID: ${{ secrets.GOOGLE_SHEETS_SPREADSHEET_ID }}

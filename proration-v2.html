@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NR Proration Calculator v2</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Barlow:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root {
+  --green:#00AC69; --green-l:#1CE783; --green-dim:rgba(0,172,105,0.12);
+  --bg:#0c0f18; --surface:#141820; --card:#1c2130; --border:#252d3d;
+  --text:#dde3f0; --muted:#6b7a99; --accent:#00d4aa;
+  --gold:#f5a623; --red:#ef4444; --blue:#3b9eff; --purple:#a78bfa;
+  --orange:#fb923c; --teal:#2dd4bf;
+  --mono:'IBM Plex Mono',monospace; --sans:'Barlow',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── HEADER ── */
+.hdr{background:linear-gradient(135deg,#071a10 0%,#0c0f18 70%);border-bottom:1px solid var(--border);padding:28px 40px;position:relative;overflow:hidden}
+.hdr::after{content:'';position:absolute;top:-80px;right:-80px;width:320px;height:320px;background:radial-gradient(circle,rgba(0,172,105,0.12),transparent 70%);pointer-events:none}
+.hdr-inner{max-width:1440px;margin:0 auto;display:flex;align-items:center;gap:18px}
+.hdr-logo{width:48px;height:48px;background:linear-gradient(135deg,var(--green),var(--green-l));border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 0 28px rgba(0,172,105,0.45);flex-shrink:0}
+.hdr-title{font-size:1.75rem;font-weight:900;color:#fff;letter-spacing:-0.5px}
+.hdr-sub{font-size:0.78rem;color:var(--muted);font-family:var(--mono);margin-top:3px}
+.hdr-badge{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.badge{padding:5px 12px;border-radius:20px;font-size:0.7rem;font-weight:700;font-family:var(--mono);white-space:nowrap}
+.badge-green{background:var(--green-dim);border:1px solid rgba(0,172,105,0.3);color:var(--green-l)}
+.badge-blue{background:rgba(59,158,255,0.12);border:1px solid rgba(59,158,255,0.3);color:#7ec8ff}
+.badge-gold{background:rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.3);color:#fcd34d}
+
+/* ── LAYOUT ── */
+.wrap{max-width:1440px;margin:0 auto;padding:32px 40px 80px}
+
+/* ── RULES BANNER ── */
+.rules-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:28px}
+.rule-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start}
+.rule-icon{font-size:18px;flex-shrink:0;margin-top:1px}
+.rule-title{font-size:0.78rem;font-weight:700;color:#fff;margin-bottom:3px}
+.rule-desc{font-size:0.72rem;color:var(--muted);line-height:1.5;font-family:var(--mono)}
+.rule-card.warn{border-color:rgba(245,166,35,0.3);background:rgba(245,166,35,0.05)}
+.rule-card.info{border-color:rgba(59,158,255,0.3);background:rgba(59,158,255,0.05)}
+.rule-card.success{border-color:rgba(0,172,105,0.3);background:rgba(0,172,105,0.05)}
+.rule-card.danger{border-color:rgba(239,68,68,0.3);background:rgba(239,68,68,0.05)}
+
+/* ── PANELS ── */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;margin-bottom:20px;overflow:hidden}
+.panel-hdr{display:flex;align-items:center;gap:12px;padding:16px 22px;border-bottom:1px solid var(--border);background:rgba(255,255,255,0.02)}
+.panel-num{width:28px;height:28px;background:linear-gradient(135deg,var(--green),var(--green-l));border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;font-weight:800;color:#000;flex-shrink:0}
+.panel-title{font-size:1rem;font-weight:700;color:#fff}
+.panel-tag{margin-left:auto;font-size:0.7rem;font-family:var(--mono);color:var(--muted)}
+.panel-body{padding:22px}
+
+/* ── FORM ── */
+.form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:16px}
+.fg label{display:block;font-size:0.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;font-family:var(--mono)}
+.fc{width:100%;background:var(--card);border:1.5px solid var(--border);border-radius:8px;color:var(--text);padding:9px 12px;font-size:0.85rem;font-family:var(--mono);outline:none;transition:border-color .2s,box-shadow .2s}
+.fc:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(0,172,105,0.15)}
+.fc option{background:var(--card)}
+
+/* Edition pricing strip */
+.pricing-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:12px}
+.price-tile{background:var(--card);border:1.5px solid var(--border);border-radius:8px;padding:10px 14px;transition:border-color .2s}
+.price-tile.active{border-color:var(--green)}
+.pt-label{font-size:0.68rem;color:var(--muted);font-family:var(--mono);font-weight:600;margin-bottom:4px;text-transform:uppercase}
+.pt-value{font-size:1.1rem;font-weight:800;color:#fff}
+.pt-value.active-val{color:var(--green-l)}
+.pt-sub{font-size:0.65rem;color:var(--muted);font-family:var(--mono);margin-top:2px}
+
+/* ── MODEL TOGGLE ── */
+.model-tabs{display:flex;gap:0;margin-bottom:20px;border:1.5px solid var(--border);border-radius:10px;overflow:hidden}
+.model-tab{flex:1;padding:11px 16px;background:var(--card);border:none;color:var(--muted);font-size:0.82rem;font-weight:700;font-family:var(--sans);cursor:pointer;transition:all .2s;text-align:center}
+.model-tab.active{background:linear-gradient(135deg,#071a10,#0f1f15);color:var(--green-l);border-bottom:2px solid var(--green)}
+.model-tab:hover:not(.active){color:var(--text)}
+
+/* ── PRODUCT SECTIONS ── */
+.section-label{font-size:0.68rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-family:var(--mono);margin:18px 0 10px;display:flex;align-items:center;gap:10px}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border)}
+
+.prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:12px;margin-bottom:4px}
+.prod-card{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:16px;transition:border-color .2s;position:relative}
+.prod-card.on{border-color:var(--green)}
+.prod-card.disabled-card{opacity:.35}
+.prod-hdr{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.prod-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.prod-name{font-size:0.85rem;font-weight:700;color:#fff;line-height:1.2}
+.prod-price-tag{font-size:0.7rem;color:var(--green-l);font-family:var(--mono);margin-top:2px}
+.prod-toggle{appearance:none;width:38px;height:20px;background:var(--border);border-radius:10px;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0}
+.prod-toggle:checked{background:var(--green)}
+.prod-toggle::after{content:'';position:absolute;width:14px;height:14px;background:#fff;border-radius:50%;top:3px;left:3px;transition:left .2s}
+.prod-toggle:checked::after{left:21px}
+.prod-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.prod-fields .fg label{font-size:0.68rem}
+.prod-fields .fc{padding:7px 10px;font-size:0.8rem}
+.prod-type-badge{position:absolute;top:12px;right:12px;font-size:0.6rem;font-weight:800;font-family:var(--mono);padding:2px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:.5px}
+.badge-user{background:rgba(167,139,250,0.15);color:#c4b5fd;border:1px solid rgba(167,139,250,0.3)}
+.badge-nonuser{background:rgba(59,158,255,0.12);color:#7ec8ff;border:1px solid rgba(59,158,255,0.25)}
+.free-note{grid-column:1/-1;font-size:0.7rem;color:var(--green-l);font-family:var(--mono);background:var(--green-dim);border-radius:5px;padding:5px 9px;margin-top:4px}
+
+/* ── CALC BTN ── */
+.calc-wrap{display:flex;justify-content:center;margin:24px 0 32px}
+.calc-btn{display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,var(--green),var(--green-l));color:#000;border:none;border-radius:12px;padding:14px 36px;font-size:1rem;font-weight:900;font-family:var(--sans);cursor:pointer;box-shadow:0 4px 24px rgba(0,172,105,0.4);transition:transform .15s,box-shadow .15s;letter-spacing:.3px}
+.calc-btn:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,172,105,0.55)}
+.calc-btn:active{transform:translateY(0)}
+
+/* ── RESULTS ── */
+#results{display:none}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:24px}
+.sum-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;position:relative;overflow:hidden}
+.sum-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.sc-green::before{background:linear-gradient(90deg,var(--green),var(--green-l))}
+.sc-gold::before{background:linear-gradient(90deg,#f5a623,#fcd34d)}
+.sc-blue::before{background:linear-gradient(90deg,#3b9eff,#06b6d4)}
+.sc-purple::before{background:linear-gradient(90deg,#a78bfa,#c4b5fd)}
+.sc-red::before{background:linear-gradient(90deg,#ef4444,#f87171)}
+.sc-teal::before{background:linear-gradient(90deg,#2dd4bf,#34d399)}
+.sum-label{font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;font-family:var(--mono);margin-bottom:8px}
+.sum-value{font-size:1.9rem;font-weight:900;color:#fff;line-height:1}
+.sum-sub{font-size:0.72rem;color:var(--muted);margin-top:5px;font-family:var(--mono)}
+
+/* ── TABLE ── */
+.tbl-wrap{border:1px solid var(--border);border-radius:12px;overflow:auto;margin-bottom:22px}
+.tbl{width:100%;border-collapse:collapse;font-size:0.82rem;min-width:700px}
+.tbl thead tr{background:linear-gradient(135deg,#071a10,#0c1810);border-bottom:2px solid var(--green)}
+.tbl th{padding:12px 14px;text-align:left;font-size:0.67rem;font-weight:700;color:var(--green-l);text-transform:uppercase;letter-spacing:.8px;font-family:var(--mono);white-space:nowrap}
+.tbl th.r,.tbl td.r{text-align:right}
+.tbl th.c,.tbl td.c{text-align:center}
+.tbl tbody tr{border-bottom:1px solid var(--border);transition:background .15s}
+.tbl tbody tr:hover{background:rgba(0,172,105,0.04)}
+.tbl tbody tr:last-child{border-bottom:none}
+.tbl td{padding:11px 14px;color:var(--text);font-family:var(--mono)}
+.tbl tfoot tr{background:linear-gradient(135deg,#071a10,#0c1810);border-top:2px solid var(--green)}
+.tbl tfoot td{font-weight:700;color:var(--green-l);padding:12px 14px;font-family:var(--mono)}
+.month-lbl{font-weight:700;color:#fff;font-family:var(--sans)}
+.ratio-pill{display:inline-block;background:var(--green-dim);border:1px solid rgba(0,172,105,0.25);color:var(--green-l);padding:2px 8px;border-radius:12px;font-size:0.72rem}
+.full-pill{background:rgba(59,158,255,0.12);border-color:rgba(59,158,255,0.25);color:#7ec8ff}
+.free-cell{color:var(--green-l);font-style:italic}
+.deducted{text-decoration:line-through;color:var(--muted);font-size:0.75rem}
+.net-val{color:#fff;font-weight:700}
+
+/* Billing notes row */
+.note-row td{background:rgba(245,166,35,0.05);border-left:3px solid var(--gold);font-size:0.72rem;color:var(--gold);padding:6px 14px;font-family:var(--mono)}
+
+/* ── CHART ── */
+.chart-panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:22px}
+.chart-title{font-size:0.92rem;font-weight:700;color:#fff;margin-bottom:14px}
+
+/* ── PRODUCT DETAIL ── */
+.prod-detail-block{margin-bottom:24px}
+.pd-title{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.pd-dot{width:8px;height:8px;background:var(--green);border-radius:50%;flex-shrink:0}
+.pd-name{font-weight:700;color:#fff;font-size:0.9rem}
+.pd-formula{font-size:0.72rem;font-family:var(--mono);color:var(--muted);background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 12px;margin-bottom:8px;border-left:3px solid var(--green)}
+
+/* ── BILLING NOTES SECTION ── */
+.billing-notes{background:rgba(245,166,35,0.06);border:1px solid rgba(245,166,35,0.25);border-radius:10px;padding:16px;margin-bottom:20px}
+.bn-title{font-size:0.82rem;font-weight:700;color:var(--gold);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.bn-item{font-size:0.78rem;color:var(--text);font-family:var(--mono);padding:4px 0;border-bottom:1px solid rgba(245,166,35,0.1);display:flex;align-items:flex-start;gap:8px}
+.bn-item:last-child{border-bottom:none}
+.bn-item::before{content:'→';color:var(--gold);flex-shrink:0}
+
+/* Downgrade warning */
+.dg-warn{background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:8px;padding:12px 16px;font-size:0.78rem;color:#fca5a5;font-family:var(--mono);display:none}
+
+/* ── MODEL-AWARE PRODUCT VISIBILITY ── */
+.prod-card{transition:opacity .25s ease, transform .25s ease, max-height .3s ease;}
+.prod-card.model-hidden{
+  display:none;
+}
+.model-info-bar{
+  display:flex;align-items:flex-start;gap:12px;
+  padding:12px 16px;border-radius:10px;margin-bottom:14px;
+  font-size:0.78rem;font-family:var(--mono);line-height:1.6;
+  border:1px solid;
+}
+.model-info-bar.user-bar{
+  background:rgba(0,172,105,0.07);border-color:rgba(0,172,105,0.25);color:var(--text);
+}
+.model-info-bar.compute-bar{
+  background:rgba(59,158,255,0.07);border-color:rgba(59,158,255,0.25);color:var(--text);
+}
+.model-info-bar .mib-icon{font-size:20px;flex-shrink:0;margin-top:1px}
+.model-info-bar .mib-body strong{color:#fff}
+.model-info-bar .mib-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.mib-chip{padding:3px 10px;border-radius:12px;font-size:0.68rem;font-weight:700;font-family:var(--mono)}
+.chip-show{background:rgba(0,172,105,.15);border:1px solid rgba(0,172,105,.3);color:var(--green-l)}
+.chip-hide{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:#fca5a5;text-decoration:line-through}
+.chip-addon{background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.25);color:#fcd34d}
+.section-hidden-note{
+  font-size:0.72rem;color:var(--muted);font-family:var(--mono);
+  padding:10px 14px;border-radius:8px;background:rgba(107,122,153,0.08);
+  border:1px dashed var(--border);text-align:center;display:none;
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-inner">
+    <div class="hdr-logo">📐</div>
+    <div>
+      <div class="hdr-title">NR Proration Calculator v2</div>
+      <div class="hdr-sub">New Relic O2C · Full Documentation-Accurate Billing Engine</div>
+    </div>
+    <div class="hdr-badge">
+      <span class="badge badge-green">USAGE-BASED</span>
+      <span class="badge badge-blue">ALL PRODUCTS</span>
+      <span class="badge badge-gold">CORRECT ROUNDING</span>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- DOCUMENTATION RULES BANNER -->
+  <div class="rules-grid">
+    <div class="rule-card success">
+      <div class="rule-icon">💡</div>
+      <div>
+        <div class="rule-title">Proration Formula</div>
+        <div class="rule-desc">Ratio = Days to Bill ÷ Actual Month Days<br>User → prorate UNIT PRICE<br>Non-User → prorate QUANTITY</div>
+      </div>
+    </div>
+    <div class="rule-card info">
+      <div class="rule-icon">🆓</div>
+      <div>
+        <div class="rule-title">100 GB Free Tier</div>
+        <div class="rule-desc">First 100 GB/month is FREE on all plans.<br>Deducted before calculating data charges.<br>Applies to Original Data & Data Plus.</div>
+      </div>
+    </div>
+    <div class="rule-card warn">
+      <div class="rule-icon">🔢</div>
+      <div>
+        <div class="rule-title">Rounding Rules</div>
+        <div class="rule-desc">GB Ingested → rounds DOWN (100.9 = 100)<br>GB Month (Live Archives) → rounds UP<br>Both per official NR documentation.</div>
+      </div>
+    </div>
+    <div class="rule-card warn">
+      <div class="rule-icon">👤</div>
+      <div>
+        <div class="rule-title">User Billing Rule</div>
+        <div class="rule-desc">Billable type = HIGHEST type set in month.<br>Once upgraded → billed full month.<br>Best to upgrade start, downgrade end.</div>
+      </div>
+    </div>
+    <div class="rule-card danger">
+      <div class="rule-icon">⚠️</div>
+      <div>
+        <div class="rule-title">Downgrade Limit</div>
+        <div class="rule-desc">Committed contracts: max 2 downgrades per user per contract year. After 2nd downgrade → billed as FPU for rest of year.</div>
+      </div>
+    </div>
+    <div class="rule-card info">
+      <div class="rule-icon">📦</div>
+      <div>
+        <div class="rule-title">Standard Edition Cap</div>
+        <div class="rule-desc">Standard plan: max 5 Full Platform Users.<br>6th user forces upgrade to Pro edition.<br>Core users have no cap on any edition.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 1: BILLING PERIOD & PLAN -->
+  <div class="panel">
+    <div class="panel-hdr">
+      <div class="panel-num">1</div>
+      <div class="panel-title">Billing Period & Plan</div>
+      <div class="panel-tag">Dates + Edition + Buying Program</div>
+    </div>
+    <div class="panel-body">
+      <div class="form-row">
+        <div class="fg"><label>Start Date</label><input type="date" class="fc" id="startDate"></div>
+        <div class="fg"><label>End Date</label><input type="date" class="fc" id="endDate"></div>
+        <div class="fg">
+          <label>Edition</label>
+          <select class="fc" id="edition" onchange="updatePricing()">
+            <option value="standard">Standard (max 5 FPU)</option>
+            <option value="pro" selected>Pro (unlimited FPU)</option>
+            <option value="enterprise">Enterprise (advanced security)</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Buying Program</label>
+          <select class="fc" id="buyingProgram" onchange="updatePricing()">
+            <option value="annual">Volume Plan — Annual Upfront</option>
+            <option value="monthly">Volume Plan — Monthly Billing</option>
+            <option value="payg">Pay As You Go (PAYG)</option>
+            <option value="savings">Savings Plan</option>
+          </select>
+        </div>
+      </div>
+      <div id="pricingStrip" class="pricing-strip"></div>
+
+      <!-- Standard cap warning -->
+      <div id="stdWarn" style="display:none;margin-top:12px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:8px;padding:10px 14px;font-size:0.78rem;color:#fca5a5;font-family:var(--mono);">
+        ⚠️ Standard edition is capped at 5 Full Platform Users. If FPU qty exceeds 5, you will be forced to Pro.
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2: BILLING MODEL -->
+  <div class="panel">
+    <div class="panel-hdr">
+      <div class="panel-num">2</div>
+      <div class="panel-title">Pricing Model</div>
+      <div class="panel-tag">Data + User vs Data + Core Compute</div>
+    </div>
+    <div class="panel-body">
+      <div class="model-tabs">
+        <button class="model-tab active" id="tab-user" onclick="setModel('user')">
+          📊 Data + User Model <span style="font-size:0.7rem;opacity:.7;">(Standard)</span>
+        </button>
+        <button class="model-tab" id="tab-compute" onclick="setModel('compute')">
+          ⚡ Data + Core Compute <span style="font-size:0.7rem;opacity:.7;">(Preview)</span>
+        </button>
+      </div>
+      <div id="model-desc-user" style="font-size:0.8rem;color:var(--muted);font-family:var(--mono);background:var(--card);border-radius:8px;padding:12px 14px;border-left:3px solid var(--green);">
+        ✅ Bill on <strong style="color:var(--text);">GB Ingested</strong> + <strong style="color:var(--text);">Full Platform / Core Users</strong>. Most common for enterprise customers.
+        Basic users are FREE. Core = $49/user. FPU = $349–$658 depending on edition/program.
+      </div>
+      <div id="model-desc-compute" style="display:none;font-size:0.8rem;color:var(--muted);font-family:var(--mono);background:var(--card);border-radius:8px;padding:12px 14px;border-left:3px solid var(--blue);">
+        ⚡ Bill on <strong style="color:var(--text);">GB Ingested</strong> + <strong style="color:var(--text);">Core CCUs</strong>. No per-user barriers — all engineers get platform access.
+        Currently in <strong style="color:#7ec8ff;">Public Preview</strong>. Contact your NR AE to enable. Synthetics included in CCU.
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3: PRODUCTS -->
+  <div class="panel">
+    <div class="panel-hdr">
+      <div class="panel-num">3</div>
+      <div class="panel-title">Configure Products & Quantities</div>
+      <div class="panel-tag">Toggle to enable · All prices from official NR docs</div>
+    </div>
+    <div class="panel-body" id="productsBody">
+
+      <!-- MODEL INFO BAR — swaps based on selection -->
+      <div id="modelInfoBar"></div>
+
+      <!-- USER PRODUCTS -->
+      <div class="section-label" id="userSecLabel">👤 User Products — Proration applies to UNIT PRICE</div>
+      <div class="section-hidden-note" id="userSecHidden">🚫 Hidden in Data + Core Compute model — no per-user billing. Users get unlimited platform access via CCU consumption.</div>
+      <div class="prod-grid" id="userProdsGrid">
+
+        <!-- Full Platform Users — Data+User only -->
+        <div class="prod-card on" id="card-fpu" data-model="user">
+          <span class="prod-type-badge badge-user">USER</span>
+          <div class="prod-hdr">
+            <div class="prod-icon" style="background:rgba(0,172,105,.15)">👤</div>
+            <div>
+              <div class="prod-name">Full Platform Users</div>
+              <div class="prod-price-tag" id="price-fpu">$349/user · Annual</div>
+            </div>
+            <input type="checkbox" class="prod-toggle" id="tog-fpu" checked onchange="toggleProd('fpu')">
+          </div>
+          <div id="fields-fpu">
+            <div class="prod-fields">
+              <div class="fg"><label>Qty (Users)</label><input type="number" class="fc" id="qty-fpu" value="10" min="0" onchange="checkStdCap()"></div>
+              <div class="fg"><label>Unit Price ($)</label><input type="number" class="fc" id="up-fpu" value="349" step=".01" min="0"></div>
+              <div class="fg"><label>Discount %</label><input type="number" class="fc" id="disc-fpu" value="0" min="0" max="100" step=".1"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Core Users — Data+User only -->
+        <div class="prod-card" id="card-core" data-model="user">
+          <span class="prod-type-badge badge-user">USER</span>
+          <div class="prod-hdr">
+            <div class="prod-icon" style="background:rgba(245,166,35,.15)">🔧</div>
+            <div>
+              <div class="prod-name">Core Users</div>
+              <div class="prod-price-tag">$49/user · All Plans</div>
+            </div>
+            <input type="checkbox" class="prod-toggle" id="tog-core" onchange="toggleProd('core')">
+          </div>
+          <div id="fields-core" style="opacity:.35;pointer-events:none">
+            <div class="prod-fields">
+              <div class="fg"><label>Qty (Users)</label><input type="number" class="fc" id="qty-core" value="5" min="0"></div>
+              <div class="fg"><label>Unit Price ($)</label><input type="number" class="fc" id="up-core" value="49" step=".01" min="0"></div>
+              <div class="fg"><label>Discount %</label><input type="number" class="fc" id="disc-core" value="0" min="0" max="100" step=".1"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Advanced Compute CCU (US) — both models (add-on for Intelligent Obs) -->
+        <div class="prod-card" id="card-ccu" data-model="both">
+          <span class="prod-type-badge badge-user">USER</span>
+          <div class="prod-hdr">
+            <div class="prod-icon" style="background:rgba(251,146,60,.15)">⚡</div>
+            <div>
+              <div class="prod-name">Advanced Compute (US CCU)</div>
+              <div class="prod-price-tag">$0.606/CCU · Intelligent Obs Add-on</div>
+            </div>
+            <input type="checkbox" class="prod-toggle" id="tog-ccu" onchange="toggleProd('ccu')">
+          </div>
+          <div id="fields-ccu" style="opacity:.35;pointer-events:none">
+            <div class="prod-fields">
+              <div class="fg"><label>Committed CCUs</label><input type="number" class="fc" id="qty-ccu" value="1000" min="0"></div>
+              <div class="fg"><label>Price/CCU ($)</label><input type="number" class="fc" id="up-ccu" value="0.606" step=".001" min="0"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Advanced Compute CCU (EU) — both models -->
+        <div class="prod-card" id="card-ccu-eu" data-model="both">
+          <span class="prod-type-badge badge-user">USER</span>
+          <div class="prod-hdr">
+            <div class="prod-icon" style="background:rgba(45,212,191,.15)">🌍⚡</div>
+            <div>
+              <div class="prod-name">Advanced Compute (EU CCU)</div>
+              <div class="prod-price-tag">$0.697/CCU · ×1.15 EU multiplier</div>
+            </div>
+            <input type="checkbox" class="prod-toggle" id="tog-ccu-eu" onchange="toggleProd('ccu-eu')">
+          </div>
+          <div id="fields-ccu-eu" style="opacity:.35;pointer-events:none">
+            <div class="prod-fields">
+              <div class="fg"><label>Committed CCUs</label><input type="number" class="fc" id="qty-ccu-eu" value="500" min="0"></div>
+              <div class="fg"><label>Price/CCU ($)</label><input type="number" class="fc" id="up-ccu-eu" value="0.697" step=".001" min="0"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Core Compute CCU (Preview) — Core Compute model ONLY -->
+        <div class="prod-card model-hidden" id="card-core-ccu" data-model="compute">
+          <span class="prod-type-badge badge-user">COMPUTE</span>
+          <div class="prod-hdr">
+            <div class="prod-icon" style="background:rgba(59,158,255,.15)">🖥️</div>
+            <div>
+              <div class="prod-name">Core Compute CCU <span style="font-size:0.65rem;background:rgba(59,158,255,.2);color:#7ec8ff;padding:1px 5px;border-radius:3px;margin-left:4px;">PREVIEW</span></div>
+              <div class="prod-price-tag">Primary billing unit · Replaces per-user fees</div>
+            </div>
+            <input type="checkbox" class="prod-toggle" id="tog-core-ccu" onchange="toggleProd('core-ccu')">
+          </div>
+          <div id="fields-core-ccu" style="opacity:.35;pointer-events:none">
+            <div class="prod-fields">
+              <div class="fg"><label>Committed CCUs</label><input type="number" class="fc" id="qty-core-ccu" value="5000" min="0"></div>
+              <div class="fg"><label>Price/CCU ($)</label><input type="number" class="fc" id="up-core-ccu" value="0.10" step=".001" min="0"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- NON-USER PRODUCTS -->
+      <div class="section-label">📦 Non-User Products — Proration applies to QUANTITY</div>
+      <div class="prod-grid">
+
+        <!-- Data Standard -->
+        <div class="prod-card" id="card-data" data-model="both">
+          <span class="prod-type-badge badge-nonuser">NON-USER</span>
+          <div class="prod-hdr">
+            <div class="prod-icon" style="background:rgba(59,158,255,.15)">💾</div>
+            <div>
+              <div class="prod-name">Data — Standard (Original)</div>
+              <div class="prod-price-tag">$0.40/GB · 8-day retention · 20B DPM</div>
+            </div>
+            <input type="checkbox" class="prod-toggle" id="tog-data" onchange="toggleProd('data')">
+          </div>
+          <div id="fields-data" style="opacity:.35;pointer-events:none">
+            <div class="prod-fields">
+              <div class="fg"><label>Committed GB</label><input type="number" class="fc" id="qty-data" value="5000" min="0"></div>
+              <div class="fg"><label>Price/GB ($)</label><input type="number" class="fc" id="up-data" value="0.40" step=".01" min="0"></div>
+              <div class="fg"><label>Usage GB (opt.)</label><input type="number" class="fc" id="use-data" placeholder="Leave blank" min="0"></div>
+              <div class="free-note">✅ 100 GB/month FREE deducted automatically</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Data Plus -->
+        <div class="prod-card" id="card-dataplus" data-model="both">
+          <span class="prod-type-badge badge-nonuser">NON-USER</span>
+          <div class="prod-hdr">
+            <div class="prod-icon" style="background:rgba(167,139,250,.15)">🔮</div>
+            <div>
+              <div class="prod-name">Data Plus</div>
+              <div class="prod-price-tag">$0.60/GB · 90-day retention · 60B DPM</div>
+            </div>
+            <input type="checkbox" class="prod-toggle" id="tog-dataplus" onchange="toggleProd('dataplus')">
+          </div>
+          <div id="fields-dataplus" style="opacity:.35;pointer-events:none">
+            <div class="prod-fields">
+              <div class="fg"><label>Committed GB</label><input type="number" class="fc" id="qty-dataplus" value="1000" min="0"></div>
+              <div class="fg"><label>Price/GB ($)</label><input type="number" class="fc" id="up-dataplus" value="0.60" step=".01" min="0"></div>
+              <div class="fg"><label>Usage GB (opt.)</label><input type="number" class="fc" id="use-dataplus" placeholder="Leave blank" min="0"></div>
+              <div class="free-note">✅ 100 GB/month FREE deducted automatically</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- EU Data Center -->
+        <div class="prod-card" id="card-eu" data-model="both">
+          <span class="prod-type-badge badge-nonuser">NON-USER</span>
+          <div class="prod-hdr">
+            <div class="prod-icon" style="background:rgba(45,212,191,.15)">🌍</div>
+            <div>
+              <div class="prod-name">EU Data Center Add-on</div>
+              <div class="prod-price-tag">+$0.05/GB · On top of Data or Data Plus</div>
+            </div>
+            <input type="checkbox" class="prod-toggle" id="tog-eu" onchange="toggleProd('eu')">
+          </div>
+          <div id="fields-eu" style="opacity:.35;pointer-events:none">
+            <div class="prod-fields">
+              <div class="fg"><label>Committed GB</label><input type="number" class="fc" id="qty-eu" value="500" min="0"></div>
+              <div class="fg"><label>Add-on Price/GB ($)</label><input type="number" class="fc" id="up-eu" value="0.05" step=".01" min="0"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Extended Retention -->
+        <div class="prod-card" id="card-ret" data-model="both">
+          <span class="prod-type-badge badge-nonuser">NON-USER</span>
+          <div class="prod-hdr">
+            <div class="prod-icon" style="background:rgba(251,146,60,.15)">📅</div>
+            <div>
+              <div class="prod-name">Extended Retention</div>
+              <div class="prod-price-tag">+$0.05/GB per 30 days added</div>
+            </div>
+            <input type="checkbox" class="prod-toggle" id="tog-ret" onchange="toggleProd('ret')">
+          </div>
+          <div id="fields-ret" style="opacity:.35;pointer-events:none">
+            <div class="prod-fields">
+              <div class="fg"><label>Committed GB</label><input type="number" class="fc" id="qty-ret" value="1000" min="0"></div>
+              <div class="fg"><label>Price/GB ($)</label><input type="number" class="fc" id="up-ret" value="0.05" step=".01" min="0"></div>
+              <div class="fg"><label>Extra 30-day periods</label><input type="number" class="fc" id="ret-periods" value="1" min="1" max="9"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Synthetic Checks — User model: separate billing. Compute model: included in CCU -->
+        <div class="prod-card" id="card-syn" data-model="both">
+          <span class="prod-type-badge badge-nonuser">NON-USER</span>
+          <div class="prod-hdr">
+            <div class="prod-icon" style="background:rgba(0,172,105,.12)">🔍</div>
+            <div>
+              <div class="prod-name">Synthetic Checks</div>
+              <div class="prod-price-tag" id="synPriceTag">$0.0055/check · Beyond free limits</div>
+            </div>
+            <input type="checkbox" class="prod-toggle" id="tog-syn" onchange="toggleProd('syn')">
+          </div>
+          <div id="fields-syn" style="opacity:.35;pointer-events:none">
+            <div class="prod-fields">
+              <div class="fg"><label>Committed Checks</label><input type="number" class="fc" id="qty-syn" value="100000" min="0"></div>
+              <div class="fg"><label>Price/Check ($)</label><input type="number" class="fc" id="up-syn" value="0.0055" step=".0001" min="0"></div>
+              <div id="synNote" style="display:none;grid-column:1/-1;font-size:0.7rem;color:#7ec8ff;font-family:var(--mono);background:rgba(59,158,255,.08);border-radius:5px;padding:5px 9px;margin-top:2px;">
+                ℹ️ In Core Compute model, Synthetics (ping, API, browser tests) are billed via CCU consumption — not a separate per-check fee.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Archives -->
+        <div class="prod-card" id="card-la" data-model="both">
+          <span class="prod-type-badge badge-nonuser">NON-USER</span>
+          <div class="prod-hdr">
+            <div class="prod-icon" style="background:rgba(239,68,68,.12)">📦</div>
+            <div>
+              <div class="prod-name">Live Archives</div>
+              <div class="prod-price-tag">$0.007/GB-Month · Rounds UP</div>
+            </div>
+            <input type="checkbox" class="prod-toggle" id="tog-la" onchange="toggleProd('la')">
+          </div>
+          <div id="fields-la" style="opacity:.35;pointer-events:none">
+            <div class="prod-fields">
+              <div class="fg"><label>Committed GB</label><input type="number" class="fc" id="qty-la" value="10000" min="0"></div>
+              <div class="fg"><label>Price/GB-Mo ($)</label><input type="number" class="fc" id="up-la" value="0.007" step=".001" min="0"></div>
+              <div style="grid-column:1/-1;font-size:0.7rem;color:var(--gold);font-family:var(--mono);background:rgba(245,166,35,.08);border-radius:5px;padding:5px 9px;margin-top:2px;">⚠️ GB Month rounds UP per NR docs. Requires Advanced Compute add-on.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vulnerability Management -->
+        <div class="prod-card" id="card-vuln" data-model="both">
+          <span class="prod-type-badge badge-nonuser">NON-USER</span>
+          <div class="prod-hdr">
+            <div class="prod-icon" style="background:rgba(239,68,68,.12)">🛡️</div>
+            <div>
+              <div class="prod-name">Vulnerability Management</div>
+              <div class="prod-price-tag">$0.10/GB · Requires Data Plus or extra cost</div>
+            </div>
+            <input type="checkbox" class="prod-toggle" id="tog-vuln" onchange="toggleProd('vuln')">
+          </div>
+          <div id="fields-vuln" style="opacity:.35;pointer-events:none">
+            <div class="prod-fields">
+              <div class="fg"><label>Committed GB</label><input type="number" class="fc" id="qty-vuln" value="500" min="0"></div>
+              <div class="fg"><label>Price/GB ($)</label><input type="number" class="fc" id="up-vuln" value="0.10" step=".01" min="0"></div>
+              <div style="grid-column:1/-1;font-size:0.7rem;color:#7ec8ff;font-family:var(--mono);background:rgba(59,158,255,.08);border-radius:5px;padding:5px 9px;margin-top:2px;">ℹ️ Free up to 100 GB with Data Plus. Charged beyond that.</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- CALCULATE -->
+  <div class="calc-wrap">
+    <button class="calc-btn" onclick="calculate()">⚡ Calculate Proration</button>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results">
+
+    <!-- Billing Notes -->
+    <div class="billing-notes" id="billingNotes"></div>
+
+    <!-- Summary -->
+    <div class="summary-grid" id="summaryCards"></div>
+
+    <!-- Chart -->
+    <div class="chart-panel">
+      <div class="chart-title">📊 Monthly Billing Breakdown by Product</div>
+      <canvas id="monthChart" height="75"></canvas>
+    </div>
+
+    <!-- Main Table -->
+    <div class="panel">
+      <div class="panel-hdr">
+        <div class="panel-num">📋</div>
+        <div class="panel-title">Month-wise Proration Table</div>
+        <div class="panel-tag">All billing rules applied · Free tier deducted · Rounding applied</div>
+      </div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr id="mainThead"></tr></thead>
+          <tbody id="mainTbody"></tbody>
+          <tfoot id="mainTfoot"></tfoot>
+        </table>
+      </div>
+      <div id="tableHint" style="display:none;align-items:center;gap:8px;padding:10px 16px;font-size:0.75rem;color:var(--muted);font-family:var(--mono);">
+        ▶ Click any month row to expand product breakdown
+      </div>
+    </div>
+
+    <!-- Per-product detail -->
+    <div class="panel">
+      <div class="panel-hdr">
+        <div class="panel-num">🔢</div>
+        <div class="panel-title">Per-Product Calculation Details</div>
+        <div class="panel-tag">Step-by-step formula per month</div>
+      </div>
+      <div class="panel-body" id="prodDetails"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────────────
+const PRICING = {
+  standard:   { annual:99,   monthly:99,   payg:99,   savings:99 },  // $10 first, $99 each up to 5
+  pro:        { annual:349,  monthly:390.88,payg:418.80,savings:349 },
+  enterprise: { annual:549,  monthly:614.88,payg:658.80,savings:549 },
+};
+
+const PRODUCTS = {
+  // USER type → prorate UNIT PRICE
+  fpu:       { label:'Full Platform Users',       type:'user',    defaultPrice:349,    defaultQty:10   },
+  core:      { label:'Core Users',                type:'user',    defaultPrice:49,     defaultQty:5    },
+  ccu:       { label:'Adv. Compute (US CCU)',     type:'user',    defaultPrice:0.606,  defaultQty:1000 },
+  'ccu-eu':  { label:'Adv. Compute (EU CCU)',     type:'user',    defaultPrice:0.697,  defaultQty:500  },
+  'core-ccu':{ label:'Core Compute CCU (Preview)',type:'user',    defaultPrice:0.10,   defaultQty:5000 },
+  // NON-USER type → prorate QUANTITY
+  data:      { label:'Data Standard',             type:'nonuser', defaultPrice:0.40,   defaultQty:5000, hasFree:true,   freeGB:100, roundDown:true  },
+  dataplus:  { label:'Data Plus',                 type:'nonuser', defaultPrice:0.60,   defaultQty:1000, hasFree:true,   freeGB:100, roundDown:true  },
+  eu:        { label:'EU Data Center Add-on',     type:'nonuser', defaultPrice:0.05,   defaultQty:500,  roundDown:true  },
+  ret:       { label:'Extended Retention',        type:'nonuser', defaultPrice:0.05,   defaultQty:1000, hasPeriods:true },
+  syn:       { label:'Synthetic Checks',          type:'nonuser', defaultPrice:0.0055, defaultQty:100000 },
+  la:        { label:'Live Archives',             type:'nonuser', defaultPrice:0.007,  defaultQty:10000, roundUp:true   },
+  vuln:      { label:'Vulnerability Management',  type:'nonuser', defaultPrice:0.10,   defaultQty:500,  roundDown:true  },
+};
+
+let billingModel = 'user';
+let chartInstance = null;
+
+// ─── INIT ─────────────────────────────────────────────────────
+(function init() {
+  // Pre-fill a realistic 3-month sample: Feb 15 → Apr 30 (partial + full + full)
+  document.getElementById('startDate').value = '2025-02-15';
+  document.getElementById('endDate').value   = '2025-04-30';
+
+  // Sample: Pro Annual, Volume Plan
+  document.getElementById('edition').value      = 'pro';
+  document.getElementById('buyingProgram').value = 'annual';
+
+  // Pre-fill FPU — already checked by default
+  document.getElementById('qty-fpu').value  = '10';
+  document.getElementById('up-fpu').value   = '349';
+  document.getElementById('disc-fpu').value = '0';
+
+  // Enable Data Standard with sample qty
+  document.getElementById('tog-data').checked = true;
+  toggleProd('data');
+  document.getElementById('qty-data').value = '5000';
+
+  // Enable Synthetic Checks with sample qty
+  document.getElementById('tog-syn').checked = true;
+  toggleProd('syn');
+  document.getElementById('qty-syn').value = '100000';
+
+  updatePricing();
+  setModel('user');
+})();
+
+function setModel(m) {
+  billingModel = m;
+  document.getElementById('tab-user').classList.toggle('active', m==='user');
+  document.getElementById('tab-compute').classList.toggle('active', m==='compute');
+  document.getElementById('model-desc-user').style.display    = m==='user'    ? 'block' : 'none';
+  document.getElementById('model-desc-compute').style.display = m==='compute' ? 'block' : 'none';
+
+  // ── Show/hide product cards based on data-model attribute ──
+  document.querySelectorAll('.prod-card[data-model]').forEach(card => {
+    const cm = card.getAttribute('data-model');
+    // 'both' = always visible, 'user' = only in user model, 'compute' = only in compute model
+    const visible = cm === 'both' || cm === m;
+    card.classList.toggle('model-hidden', !visible);
+    // If hiding a card that was toggled ON, uncheck it so it doesn't affect calculations
+    if (!visible) {
+      const tog = card.querySelector('.prod-toggle');
+      if (tog && tog.checked) {
+        tog.checked = false;
+        const id = card.id.replace('card-','');
+        const fields = document.getElementById('fields-'+id);
+        if (fields) { fields.style.opacity='.35'; fields.style.pointerEvents='none'; }
+        card.classList.remove('on');
+      }
+    }
+  });
+
+  // ── Section label & hidden note for user section ──
+  const userSecLabel  = document.getElementById('userSecLabel');
+  const userSecHidden = document.getElementById('userSecHidden');
+  if (m === 'compute') {
+    userSecLabel.style.opacity  = '.35';
+    userSecHidden.style.display = 'block';
+  } else {
+    userSecLabel.style.opacity  = '1';
+    userSecHidden.style.display = 'none';
+  }
+
+  // ── Synthetics note update ──
+  const synNote    = document.getElementById('synNote');
+  const synPriceTg = document.getElementById('synPriceTag');
+  if (m === 'compute') {
+    if (synNote) synNote.style.display = 'block';
+    if (synPriceTg) synPriceTg.textContent = '$0.0055/check · Measured via CCU in this model';
+    if (synPriceTg) synPriceTg.style.color = '#7ec8ff';
+  } else {
+    if (synNote) synNote.style.display = 'none';
+    if (synPriceTg) synPriceTg.textContent = '$0.0055/check · Beyond free limits';
+    if (synPriceTg) synPriceTg.style.color = '';
+  }
+
+  // ── Render model info bar ──
+  const bar = document.getElementById('modelInfoBar');
+  if (m === 'user') {
+    bar.innerHTML = `<div class="model-info-bar user-bar">
+      <div class="mib-icon">📊</div>
+      <div class="mib-body">
+        <strong>Data + User Model</strong> — Bill on GB Ingested + Full Platform / Core Users. Most common for enterprise customers.
+        <div class="mib-chips">
+          <span class="mib-chip chip-show">✅ Full Platform Users</span>
+          <span class="mib-chip chip-show">✅ Core Users</span>
+          <span class="mib-chip chip-show">✅ All Data Products</span>
+          <span class="mib-chip chip-addon">➕ Adv. CCU (add-on)</span>
+          <span class="mib-chip chip-hide">⛔ Core CCU</span>
+        </div>
+      </div>
+    </div>`;
+  } else {
+    bar.innerHTML = `<div class="model-info-bar compute-bar">
+      <div class="mib-icon">⚡</div>
+      <div class="mib-body">
+        <strong>Data + Core Compute Model</strong> <span style="background:rgba(59,158,255,.2);color:#7ec8ff;padding:1px 7px;border-radius:4px;font-size:.72rem;font-weight:700;">PREVIEW</span> — No per-user licensing. Entire org gets platform access. Billed on CCU consumption instead.
+        <div class="mib-chips">
+          <span class="mib-chip chip-show">✅ Core CCU (primary)</span>
+          <span class="mib-chip chip-show">✅ All Data Products</span>
+          <span class="mib-chip chip-show">✅ Synthetics via CCU</span>
+          <span class="mib-chip chip-addon">➕ Adv. CCU (Intelligent Obs)</span>
+          <span class="mib-chip chip-hide">⛔ Full Platform Users</span>
+          <span class="mib-chip chip-hide">⛔ Core Users</span>
+        </div>
+      </div>
+    </div>`;
+  }
+}
+
+function updatePricing() {
+  const ed  = document.getElementById('edition').value;
+  const prg = document.getElementById('buyingProgram').value;
+  const map = PRICING[ed];
+  const activePrice = map[prg];
+
+  // Update FPU price display & input
+  document.getElementById('up-fpu').value = activePrice;
+  document.getElementById('price-fpu').textContent = `$${activePrice}/user · ${prg.charAt(0).toUpperCase()+prg.slice(1)}`;
+
+  // Render pricing strip
+  const strip = document.getElementById('pricingStrip');
+  const labels = { annual:'Annual', monthly:'Monthly', payg:'PAYG', savings:'Savings' };
+  strip.innerHTML = Object.entries(labels).map(([k,l]) => {
+    const sel = k === prg;
+    return `<div class="price-tile ${sel?'active':''}">
+      <div class="pt-label">${ed.toUpperCase()} · ${l}</div>
+      <div class="pt-value ${sel?'active-val':''}">$${PRICING[ed][k]}</div>
+      <div class="pt-sub">per FPU/month</div>
+    </div>`;
+  }).join('');
+
+  checkStdCap();
+}
+
+function checkStdCap() {
+  const ed  = document.getElementById('edition').value;
+  const qty = parseInt(document.getElementById('qty-fpu').value) || 0;
+  document.getElementById('stdWarn').style.display = (ed==='standard' && qty>5) ? 'block' : 'none';
+}
+
+function toggleProd(id) {
+  const on = document.getElementById('tog-'+id).checked;
+  const fields = document.getElementById('fields-'+id);
+  const card   = document.getElementById('card-'+id);
+  if (fields) { fields.style.opacity = on ? '1' : '.35'; fields.style.pointerEvents = on ? '' : 'none'; }
+  if (card)   card.classList.toggle('on', on);
+}
+
+// ─── HELPERS ──────────────────────────────────────────────────
+function daysInMonth(y, m) { return new Date(y, m+1, 0).getDate(); }
+
+function getMonthSpans(sd, ed) {
+  const spans = [];
+  let cur = new Date(sd.getFullYear(), sd.getMonth(), 1);
+  const end = new Date(ed.getFullYear(), ed.getMonth(), 1);
+  while (cur <= end) {
+    const y = cur.getFullYear(), m = cur.getMonth();
+    const total = daysInMonth(y, m);
+    const bs = (y===sd.getFullYear()&&m===sd.getMonth()) ? sd.getDate() : 1;
+    const be = (y===ed.getFullYear()&&m===ed.getMonth()) ? ed.getDate() : total;
+    const dtb = be - bs + 1;
+    spans.push({
+      y, m, total, bs, be, dtb,
+      ratio: Math.round((dtb/total)*10000000)/10000000,
+      label: new Date(y,m,1).toLocaleString('default',{month:'long',year:'numeric'}),
+      short: new Date(y,m,1).toLocaleString('default',{month:'short',year:'2-digit'}),
+    });
+    cur = new Date(y, m+1, 1);
+  }
+  return spans;
+}
+
+function getActiveProds() {
+  return Object.entries(PRODUCTS).filter(([id]) => {
+    const tog = document.getElementById('tog-'+id);
+    return tog && tog.checked;
+  });
+}
+
+function getVal(id, field) {
+  const el = document.getElementById(field+'-'+id);
+  return el ? (parseFloat(el.value) || 0) : 0;
+}
+
+function calcProduct(id, span) {
+  const meta  = PRODUCTS[id];
+  const qty   = getVal(id,'qty');
+  const price = getVal(id,'up');
+  const disc  = getVal(id,'disc') / 100;
+  const netPrice = price * (1 - disc);
+
+  if (meta.type === 'user') {
+    // Prorate UNIT PRICE
+    const proratedUnitPrice = netPrice * span.ratio;
+    const total = qty * proratedUnitPrice;
+    return { qty, listPrice:price, netPrice, proratedUnitPrice, total, type:'user' };
+  } else {
+    // Prorate QUANTITY
+    const usageEl = document.getElementById('use-'+id);
+    const usage   = usageEl ? (parseFloat(usageEl.value)||null) : null;
+    const periods = id==='ret' ? (parseInt(document.getElementById('ret-periods')?.value)||1) : 1;
+
+    let rawProratedQty = qty * span.ratio;
+
+    // Apply rounding rules per NR docs
+    if (meta.roundDown) rawProratedQty = Math.floor(rawProratedQty);
+    if (meta.roundUp)   rawProratedQty = Math.ceil(rawProratedQty);
+
+    let billableQty = (usage!==null&&usage>0) ? Math.min(usage * span.ratio, rawProratedQty) : rawProratedQty;
+
+    // Free tier deduction (100 GB/month for data products)
+    let freeDed = 0;
+    if (meta.hasFree) {
+      const proratedFree = meta.freeGB * span.ratio;
+      freeDed = Math.min(proratedFree, billableQty);
+      billableQty = Math.max(0, billableQty - freeDed);
+      if (meta.roundDown) billableQty = Math.floor(billableQty);
+    }
+
+    const total = billableQty * netPrice * periods;
+    return { qty, rawProratedQty, billableQty, freeDed, netPrice, periods, total, type:'nonuser' };
+  }
+}
+
+// ─── MAIN CALCULATE ───────────────────────────────────────────
+function calculate() {
+  const sv = document.getElementById('startDate').value;
+  const ev = document.getElementById('endDate').value;
+  if (!sv||!ev) { alert('Please select Start and End dates'); return; }
+  const sd = new Date(sv+'T00:00:00'), ed = new Date(ev+'T00:00:00');
+  if (ed < sd) { alert('End date must be after start date'); return; }
+
+  const spans    = getMonthSpans(sd, ed);
+  const actProds = getActiveProds();
+  const fmt = n => '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+  // ── Build billing notes ──
+  const notes = [];
+  const fpuQty = parseInt(document.getElementById('qty-fpu').value)||0;
+  const ed2    = document.getElementById('edition').value;
+  if (ed2==='standard' && fpuQty>5) notes.push(`⚠️ Standard edition: ${fpuQty} FPU exceeds 5-user cap → must upgrade to Pro ($349/user)`);
+  notes.push(`💡 User billing: highest user type in calendar month is billed for the FULL month`);
+  notes.push(`🔢 GB Ingested rounds DOWN to nearest integer per NR docs`);
+  notes.push(`🔢 Live Archives (GB-Month) rounds UP to nearest integer per NR docs`);
+  const hasData = actProds.find(([id])=>id==='data'||id==='dataplus');
+  if (hasData) notes.push(`🆓 100 GB/month free tier deducted from Data/Data Plus before charging`);
+  const prog = document.getElementById('buyingProgram').value;
+  if (prog==='savings') notes.push(`💰 Savings Plan: rollover of unused funds requires ≥80% of prior year commitment at renewal`);
+  if (prog!=='payg') notes.push(`📋 Commitment contract: max 2 FPU downgrades per user per contract year`);
+  notes.push(`📅 All billing uses UTC timezone for month start/end calculations`);
+
+  document.getElementById('billingNotes').innerHTML = `
+    <div class="bn-title">⚡ Billing Rules Applied</div>
+    ${notes.map(n=>`<div class="bn-item">${n}</div>`).join('')}
+  `;
+
+  // ── Build simplified 4-col month table ──
+  const thead = document.getElementById('mainThead');
+  thead.innerHTML = `
+    <th>Month</th>
+    <th class="c">Days Billed / Total</th>
+    <th class="c">Proration Ratio</th>
+    <th class="r" style="color:var(--green-l)">Month Total</th>`;
+
+  const tbody   = document.getElementById('mainTbody');
+  tbody.innerHTML = '';
+  const prodTotals = {};
+  actProds.forEach(([id])=>prodTotals[id]=0);
+  let grandTotal = 0;
+  const monthTotals = [];
+  const allSpanCalcs = []; // store for product detail panel
+
+  spans.forEach(span => {
+    const isFull = span.dtb === span.total;
+    let rowTotal = 0;
+    const spanCalcs = {};
+
+    actProds.forEach(([id]) => {
+      const c = calcProduct(id, span);
+      rowTotal += c.total;
+      prodTotals[id] += c.total;
+      spanCalcs[id] = c;
+    });
+
+    grandTotal += rowTotal;
+    monthTotals.push({ label: span.short, total: rowTotal, span, spanCalcs });
+    allSpanCalcs.push({ span, spanCalcs, rowTotal });
+
+    // Build product breakdown lines (hidden by default, shown on expand)
+    const breakdownRows = actProds.map(([id, meta]) => {
+      const c = spanCalcs[id];
+      let detail = '';
+      if (c.type === 'user') {
+        detail = `${c.qty} users × $${c.proratedUnitPrice.toFixed(4)}/user`;
+      } else {
+        detail = `${c.billableQty.toFixed(1)} billable ${meta.label.includes('Check')?'checks':'GB'}`;
+        if (c.freeDed > 0) detail += ` <span style="color:var(--green-l)">(−${c.freeDed.toFixed(1)} free)</span>`;
+      }
+      return `<tr class="breakdown-row" id="br-${span.y}-${span.m}-${id}" style="display:none;background:rgba(0,172,105,0.03)">
+        <td style="padding:6px 14px 6px 36px;font-size:0.75rem;color:var(--muted);font-family:var(--mono)">
+          ↳ ${meta.label}</td>
+        <td class="c" style="font-size:0.75rem;color:var(--muted);font-family:var(--mono)" colspan="2">${detail}</td>
+        <td class="r" style="font-size:0.75rem;font-family:var(--mono);color:${c.total===0?'var(--green-l)':'var(--text)'}">${c.total===0?'FREE':fmt(c.total)}</td>
+      </tr>`;
+    }).join('');
+
+    const expandId = `exp-${span.y}-${span.m}`;
+    const tr = document.createElement('template');
+    tr.innerHTML = `
+      <tr class="month-main-row" style="cursor:pointer" onclick="toggleBreakdown('${span.y}-${span.m}', ${actProds.map(([id])=>`'${id}'`).join(',')})">
+        <td class="month-lbl" style="display:flex;align-items:center;gap:8px;padding:13px 14px">
+          <span id="${expandId}" style="font-size:0.7rem;color:var(--muted);transition:transform .2s;display:inline-block">▶</span>
+          ${span.label}
+          ${isFull ? '<span style="font-size:.65rem;background:rgba(59,158,255,.15);color:#7ec8ff;padding:1px 6px;border-radius:3px;margin-left:4px;">FULL</span>' : '<span style="font-size:.65rem;background:rgba(245,166,35,.12);color:var(--gold);padding:1px 6px;border-radius:3px;margin-left:4px;">PARTIAL</span>'}
+        </td>
+        <td class="c" style="font-family:var(--mono)">
+          <strong style="color:#fff">${span.dtb}</strong><span style="color:var(--muted)"> / ${span.total} days</span>
+        </td>
+        <td class="c">
+          <span class="ratio-pill ${isFull?'full-pill':''}">${(span.ratio*100).toFixed(2)}%</span>
+          <div style="font-size:.65rem;color:var(--muted);font-family:var(--mono);margin-top:2px">${span.dtb}÷${span.total}=${span.ratio.toFixed(7)}</div>
+        </td>
+        <td class="r" style="color:var(--green-l);font-weight:800;font-size:.95rem">${fmt(rowTotal)}</td>
+      </tr>
+      ${breakdownRows}`;
+
+    Array.from(tr.content.childNodes).forEach(n => tbody.appendChild(n.cloneNode(true)));
+  });
+
+  // ── Footer ──
+  document.getElementById('mainTfoot').innerHTML = `
+    <tr>
+      <td>GRAND TOTAL · ${spans.length} month${spans.length>1?'s':''}</td>
+      <td class="c" style="font-family:var(--mono)">${spans.reduce((s,sp)=>s+sp.dtb,0)} days billed</td>
+      <td class="c" style="font-family:var(--mono)">${actProds.length} product${actProds.length>1?'s':''} active</td>
+      <td class="r" style="font-size:1.05rem">${fmt(grandTotal)}</td>
+    </tr>`;
+
+  // ── Hint below table ──
+  document.getElementById('tableHint').style.display = 'flex';
+
+  // ── Summary cards ──
+  const totalDays  = spans.reduce((s,sp)=>s+sp.dtb,0);
+  const avgRatio   = spans.reduce((s,sp)=>s+sp.ratio,0)/spans.length;
+  const fullMonths = spans.filter(s=>s.ratio===1).length;
+
+  // Calculate total free tier savings
+  let freeSavings = 0;
+  actProds.filter(([id])=>PRODUCTS[id].hasFree).forEach(([id])=>{
+    spans.forEach(sp=>{
+      const c = calcProduct(id,sp);
+      freeSavings += c.freeDed * PRODUCTS[id].defaultPrice;
+    });
+  });
+
+  document.getElementById('summaryCards').innerHTML = [
+    {cls:'sc-green', label:'Grand Total',     value:fmt(grandTotal),      sub:`${spans.length} month${spans.length>1?'s':''} · ${totalDays} days`},
+    {cls:'sc-gold',  label:'Avg Proration',   value:(avgRatio*100).toFixed(1)+'%', sub:`${fullMonths} full months · ${spans.length-fullMonths} partial`},
+    {cls:'sc-blue',  label:'Active Products', value:actProds.length,       sub:`of ${Object.keys(PRODUCTS).length} available`},
+    {cls:'sc-teal',  label:'Free Tier Saved', value:fmt(freeSavings),      sub:'100 GB/mo deducted from data'},
+    {cls:'sc-purple',label:'Billing Model',   value:billingModel==='user'?'D+User':'D+Compute', sub:document.getElementById('edition').value.toUpperCase()},
+    {cls:'sc-red',   label:'Buying Program',  value:document.getElementById('buyingProgram').options[document.getElementById('buyingProgram').selectedIndex].text.split(' ')[0], sub:'Auto-renews · 30-day change notice'},
+  ].map(c=>`<div class="sum-card ${c.cls}"><div class="sum-label">${c.label}</div><div class="sum-value">${c.value}</div><div class="sum-sub">${c.sub}</div></div>`).join('');
+
+  // ── Chart ──
+  if (chartInstance) chartInstance.destroy();
+  const colors = ['#00AC69','#f5a623','#3b9eff','#a78bfa','#fb923c','#ef4444','#2dd4bf','#fcd34d','#34d399','#f472b6','#60a5fa','#818cf8'];
+  chartInstance = new Chart(document.getElementById('monthChart').getContext('2d'), {
+    type:'bar',
+    data:{
+      labels: spans.map(s=>s.short),
+      datasets: actProds.map(([id,meta],i)=>({
+        label: meta.label,
+        data: spans.map(sp=>Math.round(calcProduct(id,sp).total*100)/100),
+        backgroundColor: colors[i%colors.length]+'bb',
+        borderColor: colors[i%colors.length],
+        borderWidth:1, borderRadius:4,
+      }))
+    },
+    options:{
+      responsive:true,
+      plugins:{
+        legend:{position:'top',labels:{color:'#6b7a99',font:{family:'IBM Plex Mono',size:10}}},
+        tooltip:{
+          backgroundColor:'#1c2130', borderColor:'#252d3d', borderWidth:1,
+          titleColor:'#fff', bodyColor:'#6b7a99', footerColor:'#00AC69',
+          callbacks:{
+            label:ctx=>` ${ctx.dataset.label}: $${ctx.parsed.y.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`,
+            footer:items=>`  Total: $${items.reduce((s,i)=>s+i.parsed.y,0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`
+          }
+        }
+      },
+      scales:{
+        x:{stacked:true,ticks:{color:'#6b7a99',font:{family:'IBM Plex Mono'}},grid:{color:'#252d3d'}},
+        y:{stacked:true,ticks:{color:'#6b7a99',font:{family:'IBM Plex Mono'},callback:v=>'$'+v.toLocaleString()},grid:{color:'#252d3d'}}
+      }
+    }
+  });
+
+  // ── Per-product summary table (replaces verbose detail blocks) ──
+  const detEl = document.getElementById('prodDetails');
+  detEl.innerHTML = `
+    <div style="margin-bottom:16px">
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th class="c">Type</th>
+              <th class="c">Proration Rule</th>
+              ${spans.map(sp=>`<th class="r" style="font-size:.65rem">${sp.short}</th>`).join('')}
+              <th class="r" style="color:var(--green-l)">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${actProds.map(([id, meta]) => {
+              const isUser = meta.type === 'user';
+              const monthVals = spans.map(sp => {
+                const c = calcProduct(id, sp);
+                return `<td class="r" style="font-family:var(--mono);font-size:.8rem">${c.total===0?'<span style="color:var(--green-l)">FREE</span>':fmt(c.total)}</td>`;
+              }).join('');
+              return `<tr>
+                <td style="font-weight:600;color:#fff">${meta.label}</td>
+                <td class="c"><span class="mib-chip ${isUser?'chip-show':'chip-addon'}" style="font-size:.65rem">${isUser?'USER':'NON-USER'}</span></td>
+                <td class="c" style="font-size:.72rem;font-family:var(--mono);color:var(--muted)">${isUser?'Prorate Unit Price':'Prorate Quantity'}</td>
+                ${monthVals}
+                <td class="r" style="font-weight:800;color:var(--green-l);font-family:var(--mono)">${fmt(prodTotals[id])}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+
+  document.getElementById('results').style.display = 'block';
+  document.getElementById('results').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// ─── TOGGLE MONTH BREAKDOWN ───────────────────────────────────
+function toggleBreakdown(key, ...prodIds) {
+  const arrow    = document.getElementById(`exp-${key}`);
+  const firstRow = document.getElementById(`br-${key}-${prodIds[0]}`);
+  if (!firstRow) return;
+  const isOpen   = firstRow.style.display !== 'none';
+  prodIds.forEach(id => {
+    const row = document.getElementById(`br-${key}-${id}`);
+    if (row) row.style.display = isOpen ? 'none' : 'table-row';
+  });
+  if (arrow) arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(90deg)';
+}
+</script>
+</body>
+</html>
